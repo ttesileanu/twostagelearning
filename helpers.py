@@ -6,6 +6,8 @@ import numpy as np
 import math
 import os
 
+from matplotlib import animation
+
 # visualization
 def show_repetition_pattern(monitors, **kwargs):
     """ Show the spiking pattern for a set of neurons over a series of repetitions.
@@ -675,3 +677,118 @@ def get_firing_rate(res, tmax):
 
     crt_times = crt_times0[crt_times0 < tmax]
     return len(crt_times)*1000.0/tmax/N
+
+def make_convergence_movie(fname, res, target, fps=30.0, length=5.0, muscle=0, ymax=None,
+                           invert=False, idxs=None, colorcycle=[[1.0, 0.2, 0.2], [0.2, 0.2, 1.0]],
+                           labels=None):
+    """ Make a movie showing convergence of motor program.
+    
+    Parameters
+    ----------
+      fname: string
+          Output file name.
+      res: list of dictionaries, or tuple of lists
+          The results of the simulation. If this is a tuple of lists, a trace is drawn
+          for each of the simulations.
+      target: array
+          Target motor program.
+      fps: float
+          Frame rate.
+      length: float
+          Length of movie (in seconds).
+      muscle: None, int
+          If not `None`, a muscle to focus on. If `None`, all muscles are
+          shown.
+      ymax: None, float
+          If not `None`, sets the `ylim` to `(0, ymax)`.
+      invert: bool
+          Set to `True` to invert the colors.
+      idxs: None, sequence of int
+          If not `None`, use only a subset of all the frames in `res`.
+      colorcycle: list of colors
+          Colors to be used for drawing the results. These can be in any format
+          understood by Matplotlib (letters, strings, triples or quadruples of float).
+      labels: list of strings
+          Labels to use for the motor programs. Set to `None` to disable the legend.
+    """
+    if hasattr(res[0], 'has_key'):
+        res = [res]
+        
+    if idxs is None:
+        idxs = range(min(len(x) for x in res))
+#    motor_idxs = np.asarray([x.has_key('motor') for x in res]).nonzero()[0]
+    res_with_motor = [np.asarray(x)[idxs] for x in res]
+    
+    nframes = int(fps*length)
+    
+    times = res_with_motor[0][0]['motor'].t[:len(target[0])]
+    
+    if invert:
+        bgdict = {'facecolor': 'k'}
+    else:
+        bgdict = {}
+        
+    fig = plt.figure(figsize=(4, 3), **bgdict)
+    
+    plt.plot(times, target[muscle], c='w' if invert else 'k', lw=0.5)
+    lines = []
+    for i, crt_res in enumerate(res_with_motor):
+        c_idx = (i % len(colorcycle))
+        if labels is not None:
+            extra = {'label': labels[i]}
+        else:
+            extra = {}
+        line, = plt.plot(times, crt_res[0]['motor'].out[muscle][:len(target[0])],
+                         c=colorcycle[c_idx], **extra)
+        lines.append(line)
+
+    title = plt.title('Stage 0', fontsize=16)
+    if labels is not None:
+        legend = plt.legend()
+    else:
+        legend = None
+    if ymax is not None:
+        plt.ylim((0, ymax))
+    plt.xlabel('time', fontsize=12)
+    plt.ylabel('motor output', fontsize=12)
+    plt.xticks([])
+    plt.yticks([])
+    
+    ax = plt.gca()
+    if invert:
+        ax.set_axis_bgcolor('black')
+        ax_color = [0.8, 0.8, 0.8]
+        title.set_color(ax_color)
+        for crt_spine in ax.spines.values():
+            crt_spine.set_color(ax_color)
+        ax.xaxis.label.set_color(ax_color)
+        ax.yaxis.label.set_color(ax_color)
+        ax.tick_params(axis='x', colors=ax_color)
+        ax.tick_params(axis='y', colors=ax_color)
+        
+        if legend is not None:
+            for crt_text in legend.get_texts():
+                crt_text.set_color(ax_color)
+        
+    ax.spines['top'].set_color('none')
+    ax.spines['right'].set_color('none')
+    
+    def animate(i):
+        """ Draw the `i`th frame. """
+        r_idx = i*len(res_with_motor[0])/nframes
+        # find an index where we have motor information
+        while r_idx > 0 and not all(crt_res[r_idx].has_key('motor') for crt_res in res_with_motor):
+            r_idx -= 1
+            
+        title.set_text('Stage {}'.format(idxs[r_idx]))
+        for crt_line, crt_res in zip(lines, res_with_motor):
+            crt_line.set_ydata(crt_res[r_idx]['motor'].out[muscle][:len(target[0])])
+        return tuple(lines) + (title,)
+    
+    def init():
+        for crt_line, crt_res in zip(lines, res_with_motor):
+            crt_line.set_ydata(crt_res[0]['motor'].out[muscle])
+        return tuple(lines) + (title,)
+    
+    anim = animation.FuncAnimation(fig, animate, np.arange(nframes), init_func=init, blit=True)
+    anim.save(fname, dpi=300, fps=fps, savefig_kwargs=bgdict, bitrate=2048.0)
