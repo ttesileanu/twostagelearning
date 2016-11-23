@@ -28,10 +28,16 @@ if __name__ == '__main__':
       required=True)
   parser.add_argument('--nreps', help="number of steps per simulation",
       default=1500)
+  parser.add_argument('--relaxation', help="simulation relaxation time",
+      default=400.0)
+  parser.add_argument('--relaxation_conductor', help="conductor relaxation",
+      default=25.0)
+  parser.add_argument('--ntaus', help="number of tau values",
+      default=8)
 
   args = parser.parse_args()
 
-  taus = 10*2**np.arange(8)
+  taus = 10*2**np.arange(int(args.ntaus))
 
   with open(args.defaults, 'rb') as inp:
     defaults = pickle.load(inp)
@@ -71,6 +77,8 @@ SCRIPT_FULL="$SCRIPT_PATH/$SCRIPT_NAME"
           format(alpha, beta, tau_tutor))
       cmdline_opts += " --nreps={} --defaults={}".format(args.nreps,
           args.defaults)
+      cmdline_opts += " --relaxation={} --relaxation_conductor={}".format(
+          args.relaxation, args.relaxation_conductor)
 
       log_name = "log/" + base_name + "_out.txt"
 

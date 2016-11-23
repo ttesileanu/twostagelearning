@@ -539,6 +539,8 @@ def make_heatmap_plot(res_matrix, size=(2.5, 2), vmin=0.1, vmax=5, norm='log',
         final_errors = np.asarray([[_[sim_idx] for _ in crt_row] for crt_row in
             res_matrix])
 
+    final_errors[~np.isfinite(final_errors)] = np.inf
+
     if args_matrix is None:
         tau_levels = [_['params']['tutor_rule_tau'] for _ in res_matrix[0]]
     else:
