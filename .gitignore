@@ -87,3 +87,8 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# generated files
+figs/*.pdf
+save/*.pkl
+spike_out/*.pkl
